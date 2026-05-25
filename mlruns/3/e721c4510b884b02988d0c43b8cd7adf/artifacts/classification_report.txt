@@ -1,0 +1,8 @@
+                precision    recall  f1-score   support
+
+No supera (A-)       0.67      0.65      0.66     25491
+        Supera       0.70      0.72      0.71     29103
+
+      accuracy                           0.68     54594
+     macro avg       0.68      0.68      0.68     54594
+  weighted avg       0.68      0.68      0.68     54594

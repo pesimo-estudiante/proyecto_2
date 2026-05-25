@@ -1,0 +1,20 @@
+artifact_path: file:c:/Users/Daiana/Documents/Analitica Computacional/Proyecto 2/Proyecto_2/mlruns/3/models/m-fd130ba6a6b0408791d193d8a2a8837b/artifacts
+flavors:
+  keras:
+    data: data
+    keras_backend: tensorflow
+    keras_version: 3.14.1
+    save_exported_model: false
+  python_function:
+    env:
+      conda: conda.yaml
+      virtualenv: python_env.yaml
+    loader_module: mlflow.keras
+    python_version: 3.12.10
+mlflow_version: 3.12.0
+model_id: m-fd130ba6a6b0408791d193d8a2a8837b
+model_size_bytes: 3582378
+model_uuid: m-fd130ba6a6b0408791d193d8a2a8837b
+prompts: null
+run_id: 7abeb32c627249b7b261c009450e4a97
+utc_time_created: '2026-05-25 15:01:54.957602'

@@ -36,7 +36,7 @@ except Exception as exc:
 
 # ── Columnas exactas esperadas por el preprocesador ──────────────────────────
 FEATURES = [
-    'PERIODO', 'EDAD',
+    'EDAD',
     'COLE_AREA_UBICACION', 'COLE_BILINGUE', 'COLE_CALENDARIO',
     'COLE_CARACTER', 'COLE_GENERO', 'COLE_JORNADA', 'COLE_MCPIO_UBICACION',
     'COLE_NATURALEZA', 'COLE_SEDE_PRINCIPAL',
@@ -207,10 +207,6 @@ app.layout = html.Div([
                                 value='No', clearable=False)),
                     ], className='form-col'),
                     html.Div([
-                        form_group('Periodo del examen (ej: 20192)',
-                            dcc.Input(id='PERIODO', type='number',
-                                      value=20192, min=20051, max=20222,
-                                      step=1, className='form-input')),
                         form_group('Edad del estudiante',
                             dcc.Slider(id='EDAD', min=14, max=25, step=1,
                                        value=16,
@@ -323,7 +319,6 @@ app.layout = html.Div([
     State('COLE_SEDE_PRINCIPAL',  'value'),
     State('ESTU_GENERO',          'value'),
     State('ESTU_PRIVADO_LIBERTAD','value'),
-    State('PERIODO',              'value'),
     State('EDAD',                 'value'),
     State('FAMI_CUARTOSHOGAR',    'value'),
     State('FAMI_EDUCACIONMADRE',  'value'),
@@ -340,7 +335,7 @@ def predict(n_clicks,
             cole_area, cole_bil, cole_cal, cole_car, cole_gen, cole_jor,
             cole_mcp, cole_nat, cole_sed,
             estu_gen, estu_lib,
-            periodo, edad,
+            edad,
             fami_cuar, fami_edm, fami_edp, fami_est, fami_per,
             fami_aut, fami_com, fami_int, fami_lav):
 
@@ -353,8 +348,7 @@ def predict(n_clicks,
 
     try:
         row = {
-            'PERIODO':               int(periodo)  if periodo  is not None else 20192,
-            'EDAD':                  int(edad)     if edad     is not None else 16,
+            'EDAD':                  int(edad) if edad is not None else 16,
             'COLE_AREA_UBICACION':   cole_area or 'Desconocido',
             'COLE_BILINGUE':         cole_bil  or 'Desconocido',
             'COLE_CALENDARIO':       cole_cal  or 'Desconocido',
