@@ -10,12 +10,12 @@ import dash
 from dash import dcc, html, Input, Output, State
 import plotly.graph_objects as go
 
-# ── Load artefacts at startup ────────────────────────────────────────────────
+# ── Rutas — compatibles con Docker (override via MODELS_DIR env var) ─────────
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, '..', 'models',
-                          'modelo_binario_supera_nivel_bajo_ingles.keras')
-PREP_PATH  = os.path.join(BASE_DIR, '..', 'models',
-                          'preprocessor_binario_ingles.pkl')
+MODELS_DIR = os.environ.get('MODELS_DIR',
+                             os.path.join(BASE_DIR, '..', 'models'))
+MODEL_PATH = os.path.join(MODELS_DIR, 'modelo_binario_supera_nivel_bajo_ingles.keras')
+PREP_PATH  = os.path.join(MODELS_DIR, 'preprocessor_binario_ingles.pkl')
 
 model        = None
 preprocessor = None
@@ -451,4 +451,6 @@ def predict(n_clicks,
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8050)
+    port  = int(os.environ.get('PORT', 8050))
+    debug = os.environ.get('DEBUG', 'false').lower() == 'true'
+    app.run(debug=debug, host='0.0.0.0', port=port)
