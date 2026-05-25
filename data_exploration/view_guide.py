@@ -53,7 +53,6 @@ def load_assets():
 def transform_features(X, preprocessor):
     """
     Aplica el preprocesador y convierte a matriz densa si es necesario.
-    TensorFlow normalmente espera arrays densos.
     """
 
     X_transformed = preprocessor.transform(X)
@@ -80,35 +79,19 @@ def predict_model(df_features, preprocessor, model):
 # ============================================================
 
 @lru_cache(maxsize=1)
-def build_profile_data():
+def build_profile_data(prediction: bool= False):
     """
     Construye perfiles poblacionales a partir de las variables categóricas.
-    El enfoque es:
-    1. Preprocesar variables categóricas.
-    2. Agrupar estudiantes con KMeans.
-    3. Calcular puntaje real y predicho por perfil.
     """
 
-    df, feature_cols, preprocessor, model = load_assets()
+    df_profiles, feature_cols, preprocessor, model = load_assets()
+    X = df_profiles[feature_cols].copy()
 
-    X = df[feature_cols].copy()
-    y_actual = df[TARGET].copy()
-
-    X_transformed = transform_features(X, preprocessor)
-
-    kmeans = KMeans(
-        n_clusters=N_PROFILES,
-        random_state=RANDOM_STATE,
-        n_init="auto"
-    )
-
-    profiles = kmeans.fit_predict(X_transformed)
-
-    df_profiles = df.copy()
-    df_profiles["PROFILE_ID"] = profiles
-
-    y_pred = predict_model(X, preprocessor, model)
-    df_profiles["PRED_PUNT_GLOBAL"] = y_pred
+    if prediction:
+        y_pred = predict_model(X, preprocessor, model)
+        df_profiles["PRED_PUNT_GLOBAL"] = y_pred
+    else:
+        df_profiles["PRED_PUNT_GLOBAL"] = df_profiles["PUNT_GLOBAL"]
 
     profile_summary = summarize_profiles(df_profiles, feature_cols)
 
@@ -220,53 +203,61 @@ def simulate_scenario(profile_summary, scenario_weights):
 def bootstrap_scenario_uncertainty(df_profiles, profile_summary, scenario_weights):
     """
     Estima incertidumbre mediante bootstrap.
-
-    La idea:
-    - Se simula una población con el mismo tamaño de la base original.
-    - Se seleccionan perfiles según las proporciones del escenario.
-    - Dentro de cada perfil, se muestrean estudiantes reales observados.
-    - Se calcula el promedio predicho.
     """
 
-    rng = np.random.default_rng(RANDOM_STATE)
-
-    profile_ids = profile_summary["PROFILE_ID"].values
     n = len(df_profiles)
 
-    predictions_by_profile = {
-        profile_id: df_profiles.loc[
-            df_profiles["PROFILE_ID"] == profile_id,
-            "PRED_PUNT_GLOBAL"
-        ].values
-        for profile_id in profile_ids
-    }
+    stats_by_profile = (
+        df_profiles
+        .groupby("PROFILE_ID")["PRED_PUNT_GLOBAL"]
+        .agg(["mean", "var", "count"])
+        .reset_index()
+    )
 
-    bootstrap_means = []
+    stats_by_profile = profile_summary[["PROFILE_ID"]].merge(
+        stats_by_profile,
+        on="PROFILE_ID",
+        how="left"
+    )
 
-    for _ in range(N_BOOTSTRAPS):
-        sampled_profiles = rng.choice(
-            profile_ids,
-            size=n,
-            replace=True,
-            p=scenario_weights
-        )
+    means = stats_by_profile["mean"].values
+    variances = stats_by_profile["var"].fillna(0).values
 
-        sampled_predictions = []
+    weights = np.array(scenario_weights, dtype=float)
+    weights = weights / weights.sum()
 
-        for profile_id in sampled_profiles:
-            values = predictions_by_profile[profile_id]
-            sampled_predictions.append(rng.choice(values))
+    # Media esperada de la mezcla
+    scenario_mean = np.sum(weights * means)
 
-        bootstrap_means.append(np.mean(sampled_predictions))
+    # E[X^2] de cada perfil = Var(X) + E[X]^2
+    expected_x2 = np.sum(weights * (variances + means ** 2))
 
-    bootstrap_means = np.array(bootstrap_means)
+    # Varianza total de la mezcla
+    mixture_variance = expected_x2 - scenario_mean ** 2
+
+    # Varianza de la media muestral
+    standard_error = np.sqrt(mixture_variance / n)
+
+    # Aproximación normal para percentiles 5, 50 y 95
+    p05 = scenario_mean - 1.645 * standard_error
+    p50 = scenario_mean
+    p95 = scenario_mean + 1.645 * standard_error
+
+    # Distribución simulada ligera para graficar histograma
+    rng = np.random.default_rng(RANDOM_STATE)
+
+    distribution = rng.normal(
+        loc=scenario_mean,
+        scale=standard_error,
+        size=N_BOOTSTRAPS
+    )
 
     return {
-        "mean": float(np.mean(bootstrap_means)),
-        "p05": float(np.percentile(bootstrap_means, 5)),
-        "p50": float(np.percentile(bootstrap_means, 50)),
-        "p95": float(np.percentile(bootstrap_means, 95)),
-        "distribution": bootstrap_means.tolist()
+        "mean": float(scenario_mean),
+        "p05": float(p05),
+        "p50": float(p50),
+        "p95": float(p95),
+        "distribution": distribution.tolist()
     }
 
 
@@ -293,10 +284,47 @@ SECTION_STYLE = {
     "marginBottom": "24px"
 }
 
+HEADER_CONTAINER_STYLE = {
+    "textAlign": "center",
+    "width": "100%",
+    "maxWidth": "1400px",
+    "margin": "0 auto 28px auto",
+}
+
+HEADER_TITLE_STYLE = {
+    "fontSize": "30px",
+    "fontWeight": "700",
+    "marginBottom": "8px",
+}
+
+HEADER_SUBTITLE_STYLE = {
+    "fontSize": "16px",
+    "color": "#4b5563",
+    "maxWidth": "1200px",
+    "margin": "0 auto",
+    "lineHeight": "1.4",
+}
 
 # ============================================================
 # COMPONENTES VISUALES
 # ============================================================
+
+
+def page_header(title, subtitle=None):
+    return html.Div(
+        [
+            html.H1(
+                title,
+                style=HEADER_TITLE_STYLE
+            ),
+            html.P(
+                subtitle,
+                style=HEADER_SUBTITLE_STYLE
+            ) if subtitle else None
+        ],
+        style=HEADER_CONTAINER_STYLE
+    )
+
 
 def kpi_card(title, value, subtitle=None):
     return html.Div(
@@ -312,15 +340,12 @@ def kpi_card(title, value, subtitle=None):
 def landing_layout():
     return html.Div(
         [
-            html.H1(
-                "¿Qué pasaría si cambia la composición social de la población estudiantil?",
-                style={"marginBottom": "8px"}
-            ),
-
-            html.P(
-                "Simula escenarios hipotéticos de desempeño educativo usando perfiles poblacionales reales "
-                "y un modelo predictivo entrenado sobre resultados históricos.",
-                style={"fontSize": "16px", "color": "#4b5563", "maxWidth": "900px"}
+            page_header(
+                title="¿Qué pasaría si cambia la composición social de la población estudiantil?",
+                subtitle=(
+                    "Simula escenarios hipotéticos de desempeño educativo usando perfiles poblacionales reales "
+                    "y un modelo predictivo entrenado sobre resultados históricos."
+                )
             ),
 
             html.Div(
@@ -350,7 +375,13 @@ def landing_layout():
                         style={**CARD_STYLE, "width": "360px"}
                     )
                 ],
-                style={"display": "flex", "gap": "16px", "marginTop": "28px"}
+                style={
+                    "display": "flex",
+                    "marginTop": "28px",
+                    "justifyContent": "center",
+                    "alignItems": "center",
+                    "width": "100%"
+                }
             ),
 
             html.Div(id="main-content")
@@ -360,24 +391,14 @@ def landing_layout():
 
 
 def simulator_layout():
-    df_profiles, profile_summary, feature_cols = build_profile_data()
-
-    total_students = len(df_profiles)
-    actual_mean = df_profiles[TARGET].mean()
-    actual_std = df_profiles[TARGET].std()
-    pred_mean = df_profiles["PRED_PUNT_GLOBAL"].mean()
-
     return html.Div(
         [
-            html.H2(
-                "Simulador de escenarios",
-                style={"marginTop": "32px"}
-            ),
-
-            html.P(
-                "El simulador modifica la composición de perfiles reales observados en la población. "
-                "Los resultados deben interpretarse como estimaciones predictivas, no como efectos causales directos.",
-                style={"color": "#4b5563", "maxWidth": "1000px"}
+            page_header(
+                title="¿Cómo cambiaría el desempeño esperado bajo un nuevo escenario?",
+                subtitle=(
+                    "El simulador modifica la composición de perfiles reales observados en la población. "
+                    "Los resultados deben interpretarse como estimaciones predictivas, no como efectos causales directos."
+                )
             ),
 
             dcc.Store(id="scenario-store"),
@@ -403,12 +424,16 @@ def simulator_layout():
 
 
 def diagnosis_tab():
-    df_profiles, profile_summary, feature_cols = build_profile_data()
+    df_profiles, profile_summary, _ = build_profile_data(prediction= False)
 
     total_students = len(df_profiles)
     actual_mean = df_profiles[TARGET].mean()
     actual_std = df_profiles[TARGET].std()
     pred_mean = df_profiles["PRED_PUNT_GLOBAL"].mean()
+
+    profile_summary_ordered = profile_summary.sort_values("PROFILE_ID")
+
+    profile_order = profile_summary_ordered["PROFILE_NAME"].tolist()
 
     fig_hist = px.histogram(
         df_profiles,
@@ -418,31 +443,65 @@ def diagnosis_tab():
     )
 
     fig_profiles = px.bar(
-        profile_summary,
+        profile_summary_ordered,
         x="PROFILE_NAME",
         y="CURRENT_PROPORTION_PCT",
-        text=profile_summary["CURRENT_PROPORTION_PCT"].round(1),
+        text=profile_summary_ordered["CURRENT_PROPORTION_PCT"].round(1),
         title="Composición actual por perfil poblacional",
         labels={
             "PROFILE_NAME": "Perfil",
             "CURRENT_PROPORTION_PCT": "Proporción actual (%)"
+        },
+        category_orders={
+            "PROFILE_NAME": profile_order
         }
+    )
+    fig_profiles.update_traces(
+        texttemplate="%{text:.1f}%",
+        textposition="outside"
+    )
+
+    fig_profiles.update_layout(
+        xaxis_title="Perfil",
+        yaxis_title="Proporción actual (%)"
     )
 
     fig_profile_score = px.bar(
-        profile_summary,
+        profile_summary_ordered,
         x="PROFILE_NAME",
         y="PRED_MEAN_SCORE",
-        text=profile_summary["PRED_MEAN_SCORE"].round(1),
+        text=profile_summary_ordered["PRED_MEAN_SCORE"].round(1),
         title="Puntaje predicho promedio por perfil",
         labels={
             "PROFILE_NAME": "Perfil",
             "PRED_MEAN_SCORE": "Puntaje predicho promedio"
+        },
+        category_orders={
+            "PROFILE_NAME": profile_order
         }
+    )
+
+    fig_profile_score.update_traces(
+        texttemplate="%{text:.1f}%",
+        textposition="outside"
+    )
+
+    fig_profile_score.update_layout(
+        xaxis_title="Perfil",
+        yaxis_title="Puntaje predicho promedio"
     )
 
     return html.Div(
         [
+            
+            page_header(
+                title="¿Cómo está compuesta actualmente la población estudiantil?",
+                subtitle=(
+                    "Explora la distribución actual de perfiles poblacionales, el puntaje global observado "
+                    "y el desempeño esperado por perfil."
+                )
+            ),
+
             html.Div(
                 [
                     kpi_card("Estudiantes analizados", f"{total_students:,.0f}"),
@@ -483,7 +542,7 @@ def diagnosis_tab():
                             {"name": "Puntaje real promedio", "id": "ACTUAL_MEAN_SCORE", "type": "numeric", "format": {"specifier": ".1f"}},
                             {"name": "Puntaje predicho promedio", "id": "PRED_MEAN_SCORE", "type": "numeric", "format": {"specifier": ".1f"}},
                         ],
-                        data=profile_summary.to_dict("records"),
+                        data=profile_summary_ordered.to_dict("records"),
                         page_size=10,
                         style_table={"overflowX": "auto"},
                         style_cell={
@@ -505,7 +564,7 @@ def diagnosis_tab():
 
 
 def simulation_tab():
-    df_profiles, profile_summary, feature_cols = build_profile_data()
+    _, profile_summary, _ = build_profile_data(prediction= False)
 
     slider_components = []
 
@@ -556,6 +615,14 @@ def simulation_tab():
 
     return html.Div(
         [
+            page_header(
+                title="¿Qué escenario quieres simular?",
+                subtitle=(
+                    "Ajusta la proporción de cada perfil poblacional para construir una composición hipotética "
+                    "de la población estudiantil."
+                )
+            ),
+            
             html.Div(
                 [
                     html.H3("Construcción del escenario hipotético"),
@@ -632,7 +699,7 @@ def results_tab(scenario_data):
     if scenario_data is None:
         return empty_results_message()
 
-    df_profiles, profile_summary, feature_cols = build_profile_data()
+    _, profile_summary, _ = build_profile_data(prediction= False)
 
     current_score = scenario_data["current_score"]
     scenario_score = scenario_data["scenario_score"]
@@ -723,6 +790,14 @@ def results_tab(scenario_data):
 
     return html.Div(
         [
+            page_header(
+                title="¿Qué resultados produciría el escenario simulado?",
+                subtitle=(
+                    "Compara el puntaje esperado actual frente al escenario simulado e identifica qué perfiles "
+                    "explican el cambio estimado."
+                )
+            ),
+            
             html.Div(
                 [
                     kpi_card("Puntaje esperado actual", f"{current_score:,.1f}"),
@@ -791,7 +866,7 @@ def results_tab(scenario_data):
 
 
 def segmentation_tab(scenario_data):
-    df_profiles, profile_summary, feature_cols = build_profile_data()
+    df_profiles, profile_summary, _ = build_profile_data(prediction= False)
 
     if scenario_data is not None:
         scenario_weights = np.array(scenario_data["scenario_weights"])
@@ -839,6 +914,14 @@ def segmentation_tab(scenario_data):
 
     return html.Div(
         [
+            page_header(
+                title="¿Qué perfiles deberían priorizarse?",
+                subtitle=(
+                    "Identifica perfiles poblacionales con bajo desempeño esperado y alto tamaño relativo dentro "
+                    "del escenario analizado."
+                )
+            ),
+            
             html.Div(
                 [
                     html.H3("Segmentación y priorización"),
@@ -933,9 +1016,10 @@ def open_simulator(n_clicks):
     Output("simulator-tab-content", "children"),
     Input("simulator-tabs", "value"),
     State("scenario-store", "data"),
-    prevent_initial_call=True
+    # prevent_initial_call=True
 )
 def render_simulator_tab(tab, scenario_data):
+    print(tab)
     if tab == "tab-diagnosis":
         return diagnosis_tab()
 
@@ -989,7 +1073,7 @@ def reset_scenario(n_clicks, slider_ids):
     if not n_clicks:
         return dash.no_update
 
-    df_profiles, profile_summary, feature_cols = build_profile_data()
+    _, profile_summary, _ = build_profile_data(prediction= False)
 
     profile_map = {
         int(row["PROFILE_ID"]): round(float(row["CURRENT_PROPORTION_PCT"]), 0)
@@ -1018,7 +1102,7 @@ def run_simulation(n_clicks, values, slider_ids):
     if not n_clicks:
         return dash.no_update, dash.no_update
 
-    df_profiles, profile_summary, feature_cols = build_profile_data()
+    df_profiles, profile_summary, _ = build_profile_data(prediction= True)
 
     slider_df = pd.DataFrame({
         "PROFILE_ID": [int(x["profile_id"]) for x in slider_ids],
