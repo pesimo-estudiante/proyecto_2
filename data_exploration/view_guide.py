@@ -477,10 +477,10 @@ def diagnosis_tab():
         x="PROFILE_NAME",
         y="PRED_MEAN_SCORE",
         text=profile_summary_ordered["PRED_MEAN_SCORE"].round(1),
-        title="Puntaje predicho promedio por perfil",
+        title="Puntaje promedio por perfil",
         labels={
             "PROFILE_NAME": "Perfil",
-            "PRED_MEAN_SCORE": "Puntaje predicho promedio"
+            "PRED_MEAN_SCORE": "Puntaje promedio"
         },
         category_orders={
             "PROFILE_NAME": profile_order
