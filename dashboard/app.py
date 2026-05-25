@@ -129,11 +129,11 @@ app.layout = html.Div([
             html.H2('Métricas del mejor modelo (Red Neuronal Binaria)',
                     className='section-title'),
             html.Div([
-                metric_card('Accuracy',  '0.6917'),
-                metric_card('Precision', '0.7178'),
-                metric_card('Recall',    '0.6950'),
-                metric_card('F1-score',  '0.7062'),
-                metric_card('ROC-AUC',   '0.7642'),
+                metric_card('Accuracy',  '0.6843'),
+                metric_card('Precision', '0.6994'),
+                metric_card('Recall',    '0.7151'),
+                metric_card('F1-score',  '0.7072'),
+                metric_card('ROC-AUC',   '0.7554'),
             ], className='metrics-row'),
         ], className='section'),
 

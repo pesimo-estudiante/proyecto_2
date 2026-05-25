@@ -10,16 +10,16 @@ escolares, familiares y socioeconómicas.
 - `0` → el estudiante permanece en nivel A-
 - `1` → el estudiante supera el nivel A- (A1, A2, B1 o B+)
 
-**Mejor modelo:** Red Neuronal Binaria — capas [512, 256, 128, 64], ELU,
-dropout 0.2, lr 0.0005
+**Mejor modelo:** Red Neuronal Binaria — capas [256, 128, 64], ReLU,
+dropout 0.3, lr 0.001
 
 | Métrica   | Valor  |
 |-----------|--------|
-| Accuracy  | 0.6917 |
-| Precision | 0.7178 |
-| Recall    | 0.6950 |
-| F1-score  | 0.7062 |
-| ROC-AUC   | 0.7642 |
+| Accuracy  | 0.6843 |
+| Precision | 0.6994 |
+| Recall    | 0.7151 |
+| F1-score  | 0.7072 |
+| ROC-AUC   | 0.7554 |
 
 ---
 
