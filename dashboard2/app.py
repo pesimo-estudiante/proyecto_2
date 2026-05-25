@@ -10,13 +10,14 @@ from dash import dcc, html, Input, Output, State
 import plotly.graph_objects as go
 
 # ── Rutas a los artefactos del modelo ────────────────────────────────────────
-BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
-DESKTOP_PATH = r"C:\Users\Nicolas Pinilla\Desktop\IND\Analitica_computancional\Proyecto 2"
+# ── Rutas — compatibles con Docker (override via MODELS_DIR env var) ─────────
+BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.environ.get('MODELS_DIR',
+                             os.path.join(BASE_DIR, '..', 'models'))
 
 def _find(filename):
     candidates = [
-        os.path.join(BASE_DIR, '..', 'models', filename),
-        os.path.join(DESKTOP_PATH, filename),
+        os.path.join(MODELS_DIR, filename),
         os.path.join(BASE_DIR, filename),
     ]
     for p in candidates:
@@ -523,4 +524,6 @@ def predict(n_clicks,
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8051)
+    port  = int(os.environ.get('PORT', 8051))
+    debug = os.environ.get('DEBUG', 'false').lower() == 'true'
+    app.run(debug=debug, host='0.0.0.0', port=port)
