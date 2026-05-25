@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import numpy as np
 import pandas as pd
 
@@ -16,13 +17,18 @@ import plotly.graph_objects as go
 
 
 # ============================================================
-# CONFIGURACIÓN GENERAL
+# CONFIGURACIÓN GENERAL — compatible con Docker
+# Override mediante variables de entorno:
+#   MODELS_DIR → carpeta con modelo y preprocesador
+#   DATA_DIR   → carpeta con data_samp.csv
 # ============================================================
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR   = Path(__file__).resolve().parent
+MODELS_DIR = Path(os.environ.get('MODELS_DIR', BASE_DIR))
+DATA_DIR   = Path(os.environ.get('DATA_DIR',   BASE_DIR))
 
-DATA_PATH = BASE_DIR / "data_samp.csv"
-MODEL_PATH = BASE_DIR / "modelo_punt_global.keras"
-PREPROCESSOR_PATH = BASE_DIR / "preprocessor.joblib"
+DATA_PATH         = DATA_DIR   / "data_samp.csv"
+MODEL_PATH        = MODELS_DIR / "modelo_punt_global.keras"
+PREPROCESSOR_PATH = MODELS_DIR / "preprocessor.joblib"
 
 TARGET = "PUNT_GLOBAL"
 
@@ -1147,4 +1153,6 @@ def run_simulation(n_clicks, values, slider_ids):
 # ============================================================
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port  = int(os.environ.get('PORT', 8052))
+    debug = os.environ.get('DEBUG', 'false').lower() == 'true'
+    app.run(debug=debug, host='0.0.0.0', port=port)
